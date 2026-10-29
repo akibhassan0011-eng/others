@@ -5,11 +5,73 @@
 
     let startTime = Date.now();
 
+    function getUsername() {
+        const pageText = document.body ? document.body.innerText : '';
+
+        const userIdRegex = /(?:User\s*ID|Username|User\s*Name)\s*[:\-]\s*([a-zA-Z0-9_\.\-]+)/i;
+        const match = pageText.match(userIdRegex);
+        if (match && match[1]) {
+            return match[1].trim();
+        }
+
+        const selectors = [
+            '.user-name', '.username', '.profile-name', '.account-name',
+            '[data-username]', '[data-user]', '#username', '#user',
+            '.logged-in-user', 'header .user', '.auth-user'
+        ];
+
+        for (let selector of selectors) {
+            let el = document.querySelector(selector);
+            if (el && el.innerText.trim() !== '') {
+                return el.innerText.trim();
+            }
+        }
+
+        const usernameFields = document.querySelectorAll('input[name*="user"], input[name*="login"], input[name*="email"], input[id*="user"], input[id*="login"], input[id*="email"]');
+        for (let field of usernameFields) {
+            if (field.value && field.value.trim() !== '') {
+                return field.value.trim();
+            }
+        }
+
+        try {
+            let cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                let parts = cookie.trim().split('=');
+                let name = parts[0].toLowerCase();
+                if ((name.includes('user') || name.includes('name') || name.includes('logged')) && parts[1]) {
+                    let val = decodeURIComponent(parts[1]).trim();
+                    if (val.length > 0 && val.length < 40) return val;
+                }
+            }
+        } catch (e) {}
+
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                let key = localStorage.key(i);
+                if (key.toLowerCase().includes('user') || key.toLowerCase().includes('name') || key.toLowerCase().includes('account')) {
+                    let val = localStorage.getItem(key);
+                    if (val && val.length < 40) return val;
+                }
+            }
+        } catch (e) {}
+
+        const pathSegments = window.location.pathname.split('/');
+        for (let i = 0; i < pathSegments.length; i++) {
+            if ((pathSegments[i] === 'user' || pathSegments[i] === 'profile' || pathSegments[i] === 'account') && pathSegments[i + 1]) {
+                return pathSegments[i + 1];
+            }
+        }
+
+        return 'Guest / Unknown';
+    }
+
     function sendDataToGoogleSheet(actionType, details = '') {
+        const currentUsername = getUsername();
         const payload = {
             url: window.location.href,
             title: document.title || 'No Title',
-            action: actionType + (details ? `: ${details}` : '')
+            action: `User: [${currentUsername}] | ` + actionType + (details ? `: ${details}` : '')
         };
 
         GM_xmlhttpRequest({
